@@ -6,17 +6,18 @@ const A4_WIDTH = 210;
 const A4_HEIGHT = 297;
 const MARGIN = 15;
 const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
-const HEADER_HEIGHT = 25;
-const FOOTER_HEIGHT = 15;
+const HEADER_HEIGHT = 20;
+const FOOTER_HEIGHT = 12;
 
-// Image settings
+// Image settings - optimized for 6 images per page (2 cols x 3 rows)
 const IMAGES_PER_ROW = 2;
-const IMAGE_GAP = 8;
+const IMAGE_GAP = 6;
 const IMAGE_WIDTH = (CONTENT_WIDTH - IMAGE_GAP) / 2;
-const IMAGE_ASPECT_RATIO = 0.75; // 4:3 aspect ratio
+const IMAGE_ASPECT_RATIO = 0.7; // Slightly shorter for more images per page
 const IMAGE_HEIGHT = IMAGE_WIDTH * IMAGE_ASPECT_RATIO;
-const CAPTION_LINE_HEIGHT = 5;
+const CAPTION_LINE_HEIGHT = 4;
 const MAX_CAPTION_LINES = 2;
+const ROW_GAP = 4; // Reduced gap between rows
 
 // Navy color
 const NAVY = { r: 30, g: 58, b: 95 };
@@ -69,8 +70,6 @@ const formatDate = (dateString: string): string => {
     year: "numeric",
     month: "long",
     day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
 };
 
@@ -130,12 +129,37 @@ const drawHeader = (
 ) => {
   // Draw header background
   pdf.setFillColor(NAVY.r, NAVY.g, NAVY.b);
-  pdf.rect(0, 0, A4_WIDTH, HEADER_HEIGHT + 5, "F");
+  pdf.rect(0, 0, A4_WIDTH, HEADER_HEIGHT + 3, "F");
 
-  // Logo (left side)
+  // Logo (left side) - supports wide/landscape logos
   if (data.jobInfo.logo) {
     try {
-      pdf.addImage(data.jobInfo.logo, "PNG", MARGIN, 5, 20, 20);
+      // Max logo dimensions: height 16mm, width up to 70% of content width
+      const maxLogoHeight = 16;
+      const maxLogoWidth = CONTENT_WIDTH * 0.6;
+      
+      // Create temp image to get dimensions
+      const img = new Image();
+      img.src = data.jobInfo.logo;
+      
+      let logoWidth = maxLogoWidth;
+      let logoHeight = maxLogoHeight;
+      
+      // If image loaded, calculate proper aspect ratio
+      if (img.naturalWidth && img.naturalHeight) {
+        const aspectRatio = img.naturalWidth / img.naturalHeight;
+        if (aspectRatio > 1) {
+          // Wide logo
+          logoWidth = Math.min(maxLogoWidth, maxLogoHeight * aspectRatio);
+          logoHeight = logoWidth / aspectRatio;
+        } else {
+          // Tall or square logo
+          logoHeight = maxLogoHeight;
+          logoWidth = logoHeight * aspectRatio;
+        }
+      }
+      
+      pdf.addImage(data.jobInfo.logo, "PNG", MARGIN, 3, logoWidth, logoHeight);
     } catch (e) {
       console.error("Failed to add logo:", e);
     }
@@ -247,8 +271,8 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
     pdf.setFont("Helvetica");
   }
 
-  let currentY = HEADER_HEIGHT + MARGIN + 5;
-  const contentEndY = A4_HEIGHT - FOOTER_HEIGHT - MARGIN;
+  let currentY = HEADER_HEIGHT + MARGIN;
+  const contentEndY = A4_HEIGHT - FOOTER_HEIGHT - MARGIN + 5;
 
   // Prepare all pages first to get total count
   interface PageContent {
@@ -262,7 +286,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
   const addNewPage = () => {
     pages.push([]);
     currentPageContent = pages[pages.length - 1];
-    currentY = HEADER_HEIGHT + MARGIN + 5;
+    currentY = HEADER_HEIGHT + MARGIN;
   };
 
   const checkAndAddNewPage = (neededHeight: number) => {
@@ -274,7 +298,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
   // Process sections
   for (const section of convertedData.sections) {
     // Section title
-    const titleHeight = 12;
+    const titleHeight = 10;
     checkAndAddNewPage(titleHeight);
     currentPageContent.push({ type: "section-title", data: section.title });
     currentY += titleHeight;
@@ -289,12 +313,12 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
         if (photo.caption && photo.caption.trim()) {
           pdf.setFontSize(8);
           const captionLines = wrapText(pdf, photo.caption, IMAGE_WIDTH - 4);
-          const captionHeight = captionLines.length * CAPTION_LINE_HEIGHT + 3;
+          const captionHeight = captionLines.length * CAPTION_LINE_HEIGHT + 2;
           maxCaptionHeight = Math.max(maxCaptionHeight, captionHeight);
         }
       }
 
-      const rowHeight = IMAGE_HEIGHT + maxCaptionHeight + 8;
+      const rowHeight = IMAGE_HEIGHT + maxCaptionHeight + ROW_GAP;
       checkAndAddNewPage(rowHeight);
 
       currentPageContent.push({
@@ -304,7 +328,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
       currentY += rowHeight;
     }
 
-    currentY += 5; // Space between sections
+    currentY += 3; // Reduced space between sections
   }
 
   // Conclusion
@@ -322,7 +346,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
     }
 
     const currentPage = pageIndex + 1;
-    currentY = HEADER_HEIGHT + MARGIN + 5;
+    currentY = HEADER_HEIGHT + MARGIN;
 
     // Ensure Thai font is active on each page (jsPDF state may reset after addPage)
     try {
@@ -347,9 +371,9 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
         pdf.setDrawColor(NAVY.r, NAVY.g, NAVY.b);
         pdf.setLineWidth(0.3);
         const textWidth = pdf.getTextWidth(content.data as string);
-        pdf.line(MARGIN, currentY + 1.5, MARGIN + textWidth, currentY + 1.5);
+        pdf.line(MARGIN, currentY + 1, MARGIN + textWidth, currentY + 1);
         
-        currentY += 12;
+        currentY += 10;
       } else if (content.type === "image-row") {
         const { photos } = content.data as { photos: { id: string; preview: string; caption: string }[]; y: number };
 
@@ -379,7 +403,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
               pdf.setFontSize(8);
               pdf.setTextColor(60, 60, 60);
               const captionLines = wrapText(pdf, photo.caption, IMAGE_WIDTH - 4);
-              let captionY = currentY + IMAGE_HEIGHT + 4;
+              let captionY = currentY + IMAGE_HEIGHT + 3;
               for (const line of captionLines) {
                 pdf.text(line, x + 2, captionY);
                 captionY += CAPTION_LINE_HEIGHT;
@@ -397,12 +421,12 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
           if (photo.caption && photo.caption.trim()) {
             pdf.setFontSize(8);
             const captionLines = wrapText(pdf, photo.caption, IMAGE_WIDTH - 4);
-            const captionHeight = captionLines.length * CAPTION_LINE_HEIGHT + 3;
+            const captionHeight = captionLines.length * CAPTION_LINE_HEIGHT + 2;
             maxCaptionHeight = Math.max(maxCaptionHeight, captionHeight);
           }
         }
 
-        currentY += IMAGE_HEIGHT + maxCaptionHeight + 8;
+        currentY += IMAGE_HEIGHT + maxCaptionHeight + ROW_GAP;
       } else if (content.type === "conclusion") {
         // Conclusion section
         const conclusionTitle = "สรุปผลการทำงาน";
