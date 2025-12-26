@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
-import { Upload, Trash2, Edit2, Check, X, ImagePlus } from "lucide-react";
+import { useState } from "react";
+import { Trash2, Edit2, Check, X } from "lucide-react";
 import { PhotoSection as PhotoSectionType, Photo } from "@/types/report";
 import PhotoCard from "./PhotoCard";
+import DropZone from "./DropZone";
 
 interface PhotoSectionProps {
   section: PhotoSectionType;
@@ -12,7 +13,6 @@ interface PhotoSectionProps {
 const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(section.title);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleTitleSave = () => {
     if (editedTitle.trim()) {
@@ -26,37 +26,31 @@ const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
     setIsEditingTitle(false);
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      const newPhotos: Photo[] = [];
-      
-      Array.from(files).forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const photo: Photo = {
-            id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            file,
-            preview: event.target?.result as string,
-            caption: "",
-          };
-          newPhotos.push(photo);
-          
-          if (newPhotos.length === files.length) {
-            onUpdate({
-              ...section,
-              photos: [...section.photos, ...newPhotos],
-            });
-          }
+  const handleFilesSelected = (files: File[]) => {
+    const newPhotos: Photo[] = [];
+    let loadedCount = 0;
+
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const photo: Photo = {
+          id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          file,
+          preview: event.target?.result as string,
+          caption: "",
         };
-        reader.readAsDataURL(file);
-      });
-    }
-    
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+        newPhotos.push(photo);
+        loadedCount++;
+
+        if (loadedCount === files.length) {
+          onUpdate({
+            ...section,
+            photos: [...section.photos, ...newPhotos],
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleCaptionChange = (photoId: string, caption: string) => {
@@ -77,11 +71,11 @@ const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
 
   const movePhoto = (fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= section.photos.length) return;
-    
+
     const newPhotos = [...section.photos];
     const [movedPhoto] = newPhotos.splice(fromIndex, 1);
     newPhotos.splice(toIndex, 0, movedPhoto);
-    
+
     onUpdate({ ...section, photos: newPhotos });
   };
 
@@ -102,10 +96,16 @@ const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
                 if (e.key === "Escape") handleTitleCancel();
               }}
             />
-            <button onClick={handleTitleSave} className="p-2 text-success hover:bg-success/10 rounded-md transition-colors">
+            <button
+              onClick={handleTitleSave}
+              className="p-2 text-success hover:bg-success/10 rounded-md transition-colors"
+            >
               <Check className="w-5 h-5" />
             </button>
-            <button onClick={handleTitleCancel} className="p-2 text-destructive hover:bg-destructive/10 rounded-md transition-colors">
+            <button
+              onClick={handleTitleCancel}
+              className="p-2 text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -120,30 +120,23 @@ const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
             </button>
           </h3>
         )}
-        
-        <div className="flex items-center gap-2">
-          <label className="btn-primary cursor-pointer text-sm">
-            <Upload className="w-4 h-4" />
-            <span className="hidden sm:inline">อัปโหลดรูป</span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handlePhotoUpload}
-              className="hidden"
-            />
-          </label>
-          <button onClick={onDelete} className="btn-danger text-sm">
-            <Trash2 className="w-4 h-4" />
-            <span className="hidden sm:inline">ลบ Section</span>
-          </button>
-        </div>
+
+        <button onClick={onDelete} className="btn-danger text-sm">
+          <Trash2 className="w-4 h-4" />
+          <span className="hidden sm:inline">ลบ Section</span>
+        </button>
       </div>
 
+      {/* Drop Zone */}
+      <DropZone 
+        onFilesSelected={handleFilesSelected} 
+        isEmpty={section.photos.length === 0}
+        className="mb-4"
+      />
+
       {/* Photos Grid */}
-      {section.photos.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {section.photos.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           {section.photos.map((photo, index) => (
             <div key={photo.id} className="relative">
               <PhotoCard
@@ -172,22 +165,6 @@ const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
               </div>
             </div>
           ))}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-border rounded-lg bg-muted/30">
-          <ImagePlus className="w-12 h-12 text-muted-foreground mb-3" />
-          <p className="text-muted-foreground mb-4">ยังไม่มีรูปภาพใน Section นี้</p>
-          <label className="btn-secondary cursor-pointer">
-            <Upload className="w-4 h-4" />
-            <span>เลือกรูปภาพ</span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handlePhotoUpload}
-              className="hidden"
-            />
-          </label>
         </div>
       )}
     </div>

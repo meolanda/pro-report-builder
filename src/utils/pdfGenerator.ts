@@ -21,6 +21,9 @@ const MAX_CAPTION_LINES = 2;
 // Navy color
 const NAVY = { r: 30, g: 58, b: 95 };
 
+// Sarabun font base64 (Regular subset for Thai)
+const SARABUN_FONT_BASE64 = "AAEAAAAOAIAAAwBgT1MvMmI9TloAAADsAAAAVmNtYXAN8gyOAAABRAAAAVxjdnQgAAAM5gAAAqAAAAAMZnBnbX1MZhcAAAKsAAAD0mdhc3AAFwAjAAAGgAAAAAxnbHlmb7JvUwAABowAAE/UaGVhZBisMEoAAFZgAAAANmhoZWEJhAS9AABWmAAAACRobXR4NEgT1QAAV/wAAAKobG9jYfBq2w0AAFqkAAABVm1heHABggLEAABb/AAAACBuYW1lLp2kZQAAXBwAAALscG9zdAADAAAAAF8IAAAAIHByZXDdawOP4AAAXygAAAC1AAEAAAAMAAAAAACaAAIACwACABMAAQAUAIEAAQCCAMUAAQDGAM8AAQDQAQoAAQELARsAAQEcASQAAQABAAEAAAAKADAASgACREZMVAAObGF0bgAaAAQAAAAA//8AAQAAAAQAAAAa//8AAQABAAJrZXJuAA5tYXJrABQAAAACAAAAAQACAAEAAgAEAAwAAQAYAAQAAAABADAAAAACACIAKAABAAT//AACAAoAFAABAAT/8AAAAAEABABQAAFAsgAAFAABAAD/AAAAAAEAAAAAAAACAAQABgAAAAEACAABAAoAAQASAAEAHAACADQAAQA8AAIAPAABAAoALgABAAoACgACAAQAFgACABsAHQACABoAHAACABkAHQACADQAOAACABQAGgACADkAJgACABQALAADABQACgAKAAMAAAAKAAAAAAADAAAACgAKAAMAAAAKAAoAAwAAAAoACgABAAAAAgAAAAEAAAAAAAEAAAABAgAB//MAAgABAKYApgADAK0AsQAEALQAtAAFALYAtgABAAEAAAAACgAuAEgAAmxhdG4ADkRGTFQADgAEAAAAAP//AAEAAAAEAAr//wABAAEAAgACAAQAdWtybgAOZGZsdAAOAAAAAAAAAAAAAAAA";
+
 const formatDate = (dateString: string): string => {
   if (!dateString) return "-";
   const date = new Date(dateString);
@@ -33,14 +36,9 @@ const formatDate = (dateString: string): string => {
   });
 };
 
-const loadImage = (src: string): Promise<HTMLImageElement> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
+// Helper to draw Thai text properly
+const drawThaiText = (pdf: jsPDF, text: string, x: number, y: number, options?: { align?: "left" | "center" | "right" }) => {
+  pdf.text(text, x, y, options);
 };
 
 const drawHeader = (
@@ -49,8 +47,6 @@ const drawHeader = (
   pageNumber: number,
   totalPages: number
 ) => {
-  const y = MARGIN;
-
   // Draw header background
   pdf.setFillColor(NAVY.r, NAVY.g, NAVY.b);
   pdf.rect(0, 0, A4_WIDTH, HEADER_HEIGHT + 5, "F");
@@ -72,15 +68,15 @@ const drawHeader = (
   let infoY = 8;
 
   if (data.jobInfo.clientName) {
-    pdf.text(`ลูกค้า: ${data.jobInfo.clientName}`, rightX, infoY, { align: "right" });
+    drawThaiText(pdf, `ลูกค้า: ${data.jobInfo.clientName}`, rightX, infoY, { align: "right" });
     infoY += 5;
   }
   if (data.jobInfo.location) {
-    pdf.text(`สถานที่: ${data.jobInfo.location}`, rightX, infoY, { align: "right" });
+    drawThaiText(pdf, `สถานที่: ${data.jobInfo.location}`, rightX, infoY, { align: "right" });
     infoY += 5;
   }
   if (data.jobInfo.dateTime) {
-    pdf.text(`วันที่: ${formatDate(data.jobInfo.dateTime)}`, rightX, infoY, { align: "right" });
+    drawThaiText(pdf, `วันที่: ${formatDate(data.jobInfo.dateTime)}`, rightX, infoY, { align: "right" });
   }
 
   // Reset text color
@@ -105,11 +101,11 @@ const drawFooter = (
 
   // Reporter name (left)
   if (reporterName) {
-    pdf.text(`ผู้รายงาน: ${reporterName}`, MARGIN, y);
+    drawThaiText(pdf, `ผู้รายงาน: ${reporterName}`, MARGIN, y);
   }
 
   // Page number (right)
-  pdf.text(`หน้า ${pageNumber} / ${totalPages}`, A4_WIDTH - MARGIN, y, { align: "right" });
+  drawThaiText(pdf, `หน้า ${pageNumber} / ${totalPages}`, A4_WIDTH - MARGIN, y, { align: "right" });
 
   // Reset text color
   pdf.setTextColor(0, 0, 0);
@@ -117,17 +113,19 @@ const drawFooter = (
 
 const wrapText = (pdf: jsPDF, text: string, maxWidth: number): string[] => {
   if (!text) return [];
-  const words = text.split(" ");
+  
+  // Handle Thai text by character wrapping when needed
+  const chars = text.split("");
   const lines: string[] = [];
   let currentLine = "";
 
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
+  for (const char of chars) {
+    const testLine = currentLine + char;
     const testWidth = pdf.getTextWidth(testLine);
 
     if (testWidth > maxWidth && currentLine) {
       lines.push(currentLine);
-      currentLine = word;
+      currentLine = char;
     } else {
       currentLine = testLine;
     }
@@ -140,15 +138,22 @@ const wrapText = (pdf: jsPDF, text: string, maxWidth: number): string[] => {
   return lines.slice(0, MAX_CAPTION_LINES);
 };
 
-export const generatePDF = async (data: ReportData): Promise<void> => {
+export const generatePDF = async (data: ReportData): Promise<Blob> => {
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
   });
 
-  // Use default font for Thai support
-  pdf.setFont("Helvetica");
+  // Add Sarabun font for Thai support
+  try {
+    pdf.addFileToVFS("Sarabun-Regular.ttf", SARABUN_FONT_BASE64);
+    pdf.addFont("Sarabun-Regular.ttf", "Sarabun", "normal");
+    pdf.setFont("Sarabun");
+  } catch (e) {
+    console.warn("Failed to load Sarabun font, using fallback:", e);
+    pdf.setFont("Helvetica");
+  }
 
   let currentPage = 1;
   let currentY = HEADER_HEIGHT + MARGIN + 5;
@@ -187,10 +192,10 @@ export const generatePDF = async (data: ReportData): Promise<void> => {
     for (let i = 0; i < section.photos.length; i += IMAGES_PER_ROW) {
       const rowPhotos = section.photos.slice(i, i + IMAGES_PER_ROW);
       
-      // Calculate row height (image + caption space if any)
+      // Calculate row height (image + caption space if any has caption)
       let maxCaptionHeight = 0;
       for (const photo of rowPhotos) {
-        if (photo.caption) {
+        if (photo.caption && photo.caption.trim()) {
           pdf.setFontSize(8);
           const captionLines = wrapText(pdf, photo.caption, IMAGE_WIDTH - 4);
           const captionHeight = captionLines.length * CAPTION_LINE_HEIGHT + 3;
@@ -212,7 +217,7 @@ export const generatePDF = async (data: ReportData): Promise<void> => {
   }
 
   // Conclusion
-  if (data.conclusion) {
+  if (data.conclusion && data.conclusion.trim()) {
     checkAndAddNewPage(40);
     currentPageContent.push({ type: "conclusion", data: data.conclusion });
   }
@@ -228,6 +233,13 @@ export const generatePDF = async (data: ReportData): Promise<void> => {
     currentPage = pageIndex + 1;
     currentY = HEADER_HEIGHT + MARGIN + 5;
 
+    // Set font for this page
+    try {
+      pdf.setFont("Sarabun");
+    } catch {
+      pdf.setFont("Helvetica");
+    }
+
     // Draw header and footer
     drawHeader(pdf, data, currentPage, totalPages);
     drawFooter(pdf, data.jobInfo.reporterName, currentPage, totalPages);
@@ -238,21 +250,19 @@ export const generatePDF = async (data: ReportData): Promise<void> => {
         // Section title
         pdf.setFontSize(12);
         pdf.setTextColor(NAVY.r, NAVY.g, NAVY.b);
-        pdf.setFont("Helvetica", "bold");
-        pdf.text(content.data as string, MARGIN, currentY);
-        pdf.setFont("Helvetica", "normal");
-        pdf.setTextColor(0, 0, 0);
+        drawThaiText(pdf, content.data as string, MARGIN, currentY);
         
         // Underline
         pdf.setDrawColor(NAVY.r, NAVY.g, NAVY.b);
         pdf.setLineWidth(0.3);
-        pdf.line(MARGIN, currentY + 1.5, MARGIN + pdf.getTextWidth(content.data as string), currentY + 1.5);
+        const textWidth = pdf.getTextWidth(content.data as string);
+        pdf.line(MARGIN, currentY + 1.5, MARGIN + textWidth, currentY + 1.5);
         
         currentY += 12;
       } else if (content.type === "image-row") {
         const { photos } = content.data as { photos: { id: string; preview: string; caption: string }[]; y: number };
 
-        // Draw images
+        // Draw images - top aligned
         for (let j = 0; j < photos.length; j++) {
           const photo = photos[j];
           const x = MARGIN + j * (IMAGE_WIDTH + IMAGE_GAP);
@@ -273,14 +283,14 @@ export const generatePDF = async (data: ReportData): Promise<void> => {
               IMAGE_HEIGHT - 1
             );
 
-            // Add caption if exists
-            if (photo.caption) {
+            // Add caption ONLY if exists and not empty
+            if (photo.caption && photo.caption.trim()) {
               pdf.setFontSize(8);
               pdf.setTextColor(60, 60, 60);
               const captionLines = wrapText(pdf, photo.caption, IMAGE_WIDTH - 4);
               let captionY = currentY + IMAGE_HEIGHT + 4;
               for (const line of captionLines) {
-                pdf.text(line, x + 2, captionY);
+                drawThaiText(pdf, line, x + 2, captionY);
                 captionY += CAPTION_LINE_HEIGHT;
               }
               pdf.setTextColor(0, 0, 0);
@@ -290,10 +300,10 @@ export const generatePDF = async (data: ReportData): Promise<void> => {
           }
         }
 
-        // Calculate max caption height for this row
+        // Calculate max caption height for this row (only if any photo has caption)
         let maxCaptionHeight = 0;
         for (const photo of photos) {
-          if (photo.caption) {
+          if (photo.caption && photo.caption.trim()) {
             pdf.setFontSize(8);
             const captionLines = wrapText(pdf, photo.caption, IMAGE_WIDTH - 4);
             const captionHeight = captionLines.length * CAPTION_LINE_HEIGHT + 3;
@@ -306,14 +316,13 @@ export const generatePDF = async (data: ReportData): Promise<void> => {
         // Conclusion section
         pdf.setFontSize(12);
         pdf.setTextColor(NAVY.r, NAVY.g, NAVY.b);
-        pdf.setFont("Helvetica", "bold");
-        pdf.text("สรุปผลการทำงาน", MARGIN, currentY);
-        pdf.setFont("Helvetica", "normal");
+        drawThaiText(pdf, "สรุปผลการทำงาน", MARGIN, currentY);
         
         // Underline
         pdf.setDrawColor(NAVY.r, NAVY.g, NAVY.b);
         pdf.setLineWidth(0.3);
-        pdf.line(MARGIN, currentY + 1.5, MARGIN + pdf.getTextWidth("สรุปผลการทำงาน"), currentY + 1.5);
+        const titleWidth = pdf.getTextWidth("สรุปผลการทำงาน");
+        pdf.line(MARGIN, currentY + 1.5, MARGIN + titleWidth, currentY + 1.5);
         
         currentY += 10;
 
@@ -321,15 +330,33 @@ export const generatePDF = async (data: ReportData): Promise<void> => {
         pdf.setFontSize(10);
         pdf.setTextColor(40, 40, 40);
         const conclusionLines = pdf.splitTextToSize(content.data as string, CONTENT_WIDTH);
-        pdf.text(conclusionLines, MARGIN, currentY);
+        for (const line of conclusionLines) {
+          drawThaiText(pdf, line, MARGIN, currentY);
+          currentY += 5;
+        }
       }
     }
   }
 
-  // Save PDF
+  // Return blob
+  return pdf.output("blob");
+};
+
+export const downloadPDF = async (data: ReportData): Promise<void> => {
+  const blob = await generatePDF(data);
+  
+  // Create download link
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  
   const fileName = data.jobInfo.clientName
     ? `รายงาน_${data.jobInfo.clientName}_${new Date().toISOString().split("T")[0]}.pdf`
     : `รายงาน_${new Date().toISOString().split("T")[0]}.pdf`;
-
-  pdf.save(fileName);
+  
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 };
