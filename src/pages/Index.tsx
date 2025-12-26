@@ -1,16 +1,24 @@
-import { useState } from "react";
-import { Plus, FileDown, FileText, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { Plus, FileDown, FileText, Loader2, Eye, Save, History } from "lucide-react";
 import JobInfoForm from "@/components/JobInfoForm";
 import PhotoSection from "@/components/PhotoSection";
 import ConclusionSection from "@/components/ConclusionSection";
+import PDFPreview from "@/components/PDFPreview";
 import { JobInfo, PhotoSection as PhotoSectionType, ReportData } from "@/types/report";
-import { generatePDF } from "@/utils/pdfGenerator";
+import { downloadPDF } from "@/utils/pdfGenerator";
 import { useToast } from "@/hooks/use-toast";
+import { useReportStorage } from "@/hooks/useReportStorage";
 
 const Index = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { saveReport, loadReport, isSaving, isLoading } = useReportStorage();
+
   const [isGenerating, setIsGenerating] = useState(false);
-  
+  const [showPreview, setShowPreview] = useState(false);
+
   const [jobInfo, setJobInfo] = useState<JobInfo>({
     clientName: "",
     dateTime: "",
@@ -29,6 +37,26 @@ const Index = () => {
 
   const [conclusion, setConclusion] = useState("");
 
+  // Load report if reportId is in URL
+  useEffect(() => {
+    const reportId = searchParams.get("reportId");
+    if (reportId) {
+      const loadData = async () => {
+        const data = await loadReport(reportId);
+        if (data) {
+          setJobInfo(data.jobInfo);
+          setSections(data.sections.length > 0 ? data.sections : [{ id: "section-1", title: "ก่อนเริ่มงาน", photos: [] }]);
+          setConclusion(data.conclusion);
+          toast({
+            title: "โหลดรายงานสำเร็จ",
+            description: "ข้อมูลรายงานถูกโหลดแล้ว",
+          });
+        }
+      };
+      loadData();
+    }
+  }, [searchParams]);
+
   const addSection = () => {
     const newSection: PhotoSectionType = {
       id: `section-${Date.now()}`,
@@ -36,7 +64,7 @@ const Index = () => {
       photos: [],
     };
     setSections([...sections, newSection]);
-    
+
     toast({
       title: "เพิ่ม Section สำเร็จ",
       description: "คุณสามารถแก้ไขชื่อ Section ได้โดยกดที่ไอคอนดินสอ",
@@ -59,16 +87,15 @@ const Index = () => {
       return;
     }
     setSections(sections.filter((s) => s.id !== sectionId));
-    
+
     toast({
       title: "ลบ Section สำเร็จ",
     });
   };
 
   const handleGeneratePDF = async () => {
-    // Validate
     const totalPhotos = sections.reduce((sum, s) => sum + s.photos.length, 0);
-    
+
     if (totalPhotos === 0) {
       toast({
         title: "ไม่มีรูปภาพ",
@@ -87,7 +114,7 @@ const Index = () => {
         conclusion,
       };
 
-      await generatePDF(reportData);
+      await downloadPDF(reportData);
 
       toast({
         title: "สร้าง PDF สำเร็จ",
@@ -105,84 +132,156 @@ const Index = () => {
     }
   };
 
+  const handleSaveReport = async () => {
+    await saveReport(jobInfo, sections, conclusion);
+  };
+
+  const handlePreview = () => {
+    const totalPhotos = sections.reduce((sum, s) => sum + s.photos.length, 0);
+
+    if (totalPhotos === 0 && !conclusion && !jobInfo.clientName) {
+      toast({
+        title: "ไม่มีข้อมูล",
+        description: "กรุณากรอกข้อมูลหรืออัปโหลดรูปภาพก่อน Preview",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setShowPreview(true);
+  };
+
   const totalPhotos = sections.reduce((sum, s) => sum + s.photos.length, 0);
+
+  const reportData: ReportData = {
+    jobInfo,
+    sections,
+    conclusion,
+  };
 
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Header */}
       <header className="bg-primary text-primary-foreground">
         <div className="container max-w-5xl py-8 px-4">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-accent/20 rounded-xl">
-              <FileText className="w-8 h-8" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-accent/20 rounded-xl">
+                <FileText className="w-8 h-8" />
+              </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                  Pro Site Report
+                </h1>
+                <p className="text-primary-foreground/80 text-sm md:text-base mt-1">
+                  สร้างรายงานรูปภาพเป็น PDF อย่างมืออาชีพ
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                Pro Site Report
-              </h1>
-              <p className="text-primary-foreground/80 text-sm md:text-base mt-1">
-                สร้างรายงานรูปภาพเป็น PDF อย่างมืออาชีพ
-              </p>
-            </div>
+
+            {/* History button */}
+            <button
+              onClick={() => navigate("/history")}
+              className="btn-secondary"
+            >
+              <History className="w-4 h-4" />
+              <span className="hidden sm:inline">ประวัติ</span>
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container max-w-5xl py-8 px-4">
-        <div className="space-y-6">
-          {/* Job Information */}
-          <JobInfoForm jobInfo={jobInfo} onChange={setJobInfo} />
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+            <p className="text-muted-foreground">กำลังโหลดรายงาน...</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Job Information */}
+            <JobInfoForm jobInfo={jobInfo} onChange={setJobInfo} />
 
-          {/* Photo Sections */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <span>รูปภาพในรายงาน</span>
-                <span className="text-sm font-normal text-muted-foreground">
-                  ({totalPhotos} รูป)
-                </span>
-              </h2>
-              <button onClick={addSection} className="btn-accent">
-                <Plus className="w-4 h-4" />
-                <span>เพิ่ม Section</span>
-              </button>
+            {/* Photo Sections */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                  <span>รูปภาพในรายงาน</span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    ({totalPhotos} รูป)
+                  </span>
+                </h2>
+                <button onClick={addSection} className="btn-accent">
+                  <Plus className="w-4 h-4" />
+                  <span>เพิ่ม Section</span>
+                </button>
+              </div>
+
+              {sections.map((section) => (
+                <PhotoSection
+                  key={section.id}
+                  section={section}
+                  onUpdate={updateSection}
+                  onDelete={() => deleteSection(section.id)}
+                />
+              ))}
             </div>
 
-            {sections.map((section) => (
-              <PhotoSection
-                key={section.id}
-                section={section}
-                onUpdate={updateSection}
-                onDelete={() => deleteSection(section.id)}
-              />
-            ))}
-          </div>
+            {/* Conclusion */}
+            <ConclusionSection conclusion={conclusion} onChange={setConclusion} />
 
-          {/* Conclusion */}
-          <ConclusionSection conclusion={conclusion} onChange={setConclusion} />
+            {/* Action Buttons */}
+            <div className="flex flex-wrap justify-center gap-4 pt-4">
+              {/* Preview Button */}
+              <button
+                onClick={handlePreview}
+                className="btn-outline text-lg px-6 py-3"
+              >
+                <Eye className="w-5 h-5" />
+                <span>Preview</span>
+              </button>
 
-          {/* Generate PDF Button */}
-          <div className="flex justify-center pt-4">
-            <button
-              onClick={handleGeneratePDF}
-              disabled={isGenerating}
-              className="btn-primary text-lg px-8 py-4 shadow-elevated hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>กำลังสร้าง PDF...</span>
-                </>
-              ) : (
-                <>
-                  <FileDown className="w-5 h-5" />
-                  <span>สร้างรายงาน PDF</span>
-                </>
-              )}
-            </button>
+              {/* Save Button */}
+              <button
+                onClick={handleSaveReport}
+                disabled={isSaving}
+                className="btn-secondary text-lg px-6 py-3 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>กำลังบันทึก...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    <span>บันทึก</span>
+                  </>
+                )}
+              </button>
+
+              {/* Generate PDF Button */}
+              <button
+                onClick={handleGeneratePDF}
+                disabled={isGenerating}
+                className="btn-primary text-lg px-8 py-4 shadow-elevated hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>กำลังสร้าง PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-5 h-5" />
+                    <span>สร้างรายงาน PDF</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Footer */}
@@ -193,6 +292,11 @@ const Index = () => {
           </p>
         </div>
       </footer>
+
+      {/* PDF Preview Modal */}
+      {showPreview && (
+        <PDFPreview data={reportData} onClose={() => setShowPreview(false)} />
+      )}
     </div>
   );
 };

@@ -14,7 +14,112 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      report_images: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          image_url: string
+          order_index: number
+          section_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          image_url: string
+          order_index?: number
+          section_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string
+          order_index?: number
+          section_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_images_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "report_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_sections: {
+        Row: {
+          created_at: string
+          id: string
+          order_index: number
+          report_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_index?: number
+          report_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_index?: number
+          report_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_sections_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reports: {
+        Row: {
+          client_name: string
+          conclusion: string | null
+          created_at: string
+          date_time: string | null
+          id: string
+          location: string | null
+          logo_url: string | null
+          reporter_name: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          client_name: string
+          conclusion?: string | null
+          created_at?: string
+          date_time?: string | null
+          id?: string
+          location?: string | null
+          logo_url?: string | null
+          reporter_name?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          client_name?: string
+          conclusion?: string | null
+          created_at?: string
+          date_time?: string | null
+          id?: string
+          location?: string | null
+          logo_url?: string | null
+          reporter_name?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
