@@ -21,9 +21,6 @@ const MAX_CAPTION_LINES = 2;
 // Navy color
 const NAVY = { r: 30, g: 58, b: 95 };
 
-// Sarabun font base64 (Regular subset for Thai)
-const SARABUN_FONT_BASE64 = "AAEAAAAOAIAAAwBgT1MvMmI9TloAAADsAAAAVmNtYXAN8gyOAAABRAAAAVxjdnQgAAAM5gAAAqAAAAAMZnBnbX1MZhcAAAKsAAAD0mdhc3AAFwAjAAAGgAAAAAxnbHlmb7JvUwAABowAAE/UaGVhZBisMEoAAFZgAAAANmhoZWEJhAS9AABWmAAAACRobXR4NEgT1QAAV/wAAAKobG9jYfBq2w0AAFqkAAABVm1heHABggLEAABb/AAAACBuYW1lLp2kZQAAXBwAAALscG9zdAADAAAAAF8IAAAAIHByZXDdawOP4AAAXygAAAC1AAEAAAAMAAAAAACaAAIACwACABMAAQAUAIEAAQCCAMUAAQDGAM8AAQDQAQoAAQELARsAAQEcASQAAQABAAEAAAAKADAASgACREZMVAAObGF0bgAaAAQAAAAA//8AAQAAAAQAAAAa//8AAQABAAJrZXJuAA5tYXJrABQAAAACAAAAAQACAAEAAgAEAAwAAQAYAAQAAAABADAAAAACACIAKAABAAT//AACAAoAFAABAAT/8AAAAAEABABQAAFAsgAAFAABAAD/AAAAAAEAAAAAAAACAAQABgAAAAEACAABAAoAAQASAAEAHAACADQAAQA8AAIAPAABAAoALgABAAoACgACAAQAFgACABsAHQACABoAHAACABkAHQACADQAOAACABQAGgACADkAJgACABQALAADABQACgAKAAMAAAAKAAAAAAADAAAACgAKAAMAAAAKAAoAAwAAAAoACgABAAAAAgAAAAEAAAAAAAEAAAABAgAB//MAAgABAKYApgADAK0AsQAEALQAtAAFALYAtgABAAEAAAAACgAuAEgAAmxhdG4ADkRGTFQADgAEAAAAAP//AAEAAAAEAAr//wABAAEAAgACAAQAdWtybgAOZGZsdAAOAAAAAAAAAAAAAAAA";
-
 const formatDate = (dateString: string): string => {
   if (!dateString) return "-";
   const date = new Date(dateString);
@@ -36,9 +33,52 @@ const formatDate = (dateString: string): string => {
   });
 };
 
-// Helper to draw Thai text properly
-const drawThaiText = (pdf: jsPDF, text: string, x: number, y: number, options?: { align?: "left" | "center" | "right" }) => {
-  pdf.text(text, x, y, options);
+// Convert image URL to Base64 to bypass CORS
+const imageToBase64 = async (imageUrl: string): Promise<string> => {
+  // If already a data URL, return as is
+  if (imageUrl.startsWith("data:")) {
+    return imageUrl;
+  }
+
+  try {
+    const response = await fetch(imageUrl, { mode: "cors" });
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error("Failed to convert image to base64:", error);
+    // Return original URL as fallback
+    return imageUrl;
+  }
+};
+
+// Preload all images and convert to Base64
+const preloadImages = async (data: ReportData): Promise<ReportData> => {
+  const convertedData = { ...data };
+  
+  // Convert logo
+  if (convertedData.jobInfo.logo) {
+    convertedData.jobInfo.logo = await imageToBase64(convertedData.jobInfo.logo);
+  }
+
+  // Convert all section photos
+  convertedData.sections = await Promise.all(
+    data.sections.map(async (section) => ({
+      ...section,
+      photos: await Promise.all(
+        section.photos.map(async (photo) => ({
+          ...photo,
+          preview: await imageToBase64(photo.preview),
+        }))
+      ),
+    }))
+  );
+
+  return convertedData;
 };
 
 const drawHeader = (
@@ -68,15 +108,15 @@ const drawHeader = (
   let infoY = 8;
 
   if (data.jobInfo.clientName) {
-    drawThaiText(pdf, `ลูกค้า: ${data.jobInfo.clientName}`, rightX, infoY, { align: "right" });
+    pdf.text(`Client: ${data.jobInfo.clientName}`, rightX, infoY, { align: "right" });
     infoY += 5;
   }
   if (data.jobInfo.location) {
-    drawThaiText(pdf, `สถานที่: ${data.jobInfo.location}`, rightX, infoY, { align: "right" });
+    pdf.text(`Location: ${data.jobInfo.location}`, rightX, infoY, { align: "right" });
     infoY += 5;
   }
   if (data.jobInfo.dateTime) {
-    drawThaiText(pdf, `วันที่: ${formatDate(data.jobInfo.dateTime)}`, rightX, infoY, { align: "right" });
+    pdf.text(`Date: ${formatDate(data.jobInfo.dateTime)}`, rightX, infoY, { align: "right" });
   }
 
   // Reset text color
@@ -101,11 +141,11 @@ const drawFooter = (
 
   // Reporter name (left)
   if (reporterName) {
-    drawThaiText(pdf, `ผู้รายงาน: ${reporterName}`, MARGIN, y);
+    pdf.text(`Reporter: ${reporterName}`, MARGIN, y);
   }
 
   // Page number (right)
-  drawThaiText(pdf, `หน้า ${pageNumber} / ${totalPages}`, A4_WIDTH - MARGIN, y, { align: "right" });
+  pdf.text(`Page ${pageNumber} / ${totalPages}`, A4_WIDTH - MARGIN, y, { align: "right" });
 
   // Reset text color
   pdf.setTextColor(0, 0, 0);
@@ -114,18 +154,17 @@ const drawFooter = (
 const wrapText = (pdf: jsPDF, text: string, maxWidth: number): string[] => {
   if (!text) return [];
   
-  // Handle Thai text by character wrapping when needed
-  const chars = text.split("");
+  const words = text.split(/\s+/);
   const lines: string[] = [];
   let currentLine = "";
 
-  for (const char of chars) {
-    const testLine = currentLine + char;
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
     const testWidth = pdf.getTextWidth(testLine);
 
     if (testWidth > maxWidth && currentLine) {
       lines.push(currentLine);
-      currentLine = char;
+      currentLine = word;
     } else {
       currentLine = testLine;
     }
@@ -139,23 +178,20 @@ const wrapText = (pdf: jsPDF, text: string, maxWidth: number): string[] => {
 };
 
 export const generatePDF = async (data: ReportData): Promise<Blob> => {
+  // Preload and convert all images to Base64 to bypass CORS
+  console.log("Preloading images...");
+  const convertedData = await preloadImages(data);
+  console.log("Images preloaded successfully");
+
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
   });
 
-  // Add Sarabun font for Thai support
-  try {
-    pdf.addFileToVFS("Sarabun-Regular.ttf", SARABUN_FONT_BASE64);
-    pdf.addFont("Sarabun-Regular.ttf", "Sarabun", "normal");
-    pdf.setFont("Sarabun");
-  } catch (e) {
-    console.warn("Failed to load Sarabun font, using fallback:", e);
-    pdf.setFont("Helvetica");
-  }
+  // Use Helvetica (built-in font that works reliably)
+  pdf.setFont("Helvetica");
 
-  let currentPage = 1;
   let currentY = HEADER_HEIGHT + MARGIN + 5;
   const contentEndY = A4_HEIGHT - FOOTER_HEIGHT - MARGIN;
 
@@ -181,7 +217,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
   };
 
   // Process sections
-  for (const section of data.sections) {
+  for (const section of convertedData.sections) {
     // Section title
     const titleHeight = 12;
     checkAndAddNewPage(titleHeight);
@@ -217,9 +253,9 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
   }
 
   // Conclusion
-  if (data.conclusion && data.conclusion.trim()) {
+  if (convertedData.conclusion && convertedData.conclusion.trim()) {
     checkAndAddNewPage(40);
-    currentPageContent.push({ type: "conclusion", data: data.conclusion });
+    currentPageContent.push({ type: "conclusion", data: convertedData.conclusion });
   }
 
   // Now render all pages
@@ -230,19 +266,12 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
       pdf.addPage();
     }
 
-    currentPage = pageIndex + 1;
+    const currentPage = pageIndex + 1;
     currentY = HEADER_HEIGHT + MARGIN + 5;
 
-    // Set font for this page
-    try {
-      pdf.setFont("Sarabun");
-    } catch {
-      pdf.setFont("Helvetica");
-    }
-
     // Draw header and footer
-    drawHeader(pdf, data, currentPage, totalPages);
-    drawFooter(pdf, data.jobInfo.reporterName, currentPage, totalPages);
+    drawHeader(pdf, convertedData, currentPage, totalPages);
+    drawFooter(pdf, convertedData.jobInfo.reporterName, currentPage, totalPages);
 
     // Render page content
     for (const content of pages[pageIndex]) {
@@ -250,7 +279,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
         // Section title
         pdf.setFontSize(12);
         pdf.setTextColor(NAVY.r, NAVY.g, NAVY.b);
-        drawThaiText(pdf, content.data as string, MARGIN, currentY);
+        pdf.text(content.data as string, MARGIN, currentY);
         
         // Underline
         pdf.setDrawColor(NAVY.r, NAVY.g, NAVY.b);
@@ -290,7 +319,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
               const captionLines = wrapText(pdf, photo.caption, IMAGE_WIDTH - 4);
               let captionY = currentY + IMAGE_HEIGHT + 4;
               for (const line of captionLines) {
-                drawThaiText(pdf, line, x + 2, captionY);
+                pdf.text(line, x + 2, captionY);
                 captionY += CAPTION_LINE_HEIGHT;
               }
               pdf.setTextColor(0, 0, 0);
@@ -316,12 +345,12 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
         // Conclusion section
         pdf.setFontSize(12);
         pdf.setTextColor(NAVY.r, NAVY.g, NAVY.b);
-        drawThaiText(pdf, "สรุปผลการทำงาน", MARGIN, currentY);
+        pdf.text("Conclusion", MARGIN, currentY);
         
         // Underline
         pdf.setDrawColor(NAVY.r, NAVY.g, NAVY.b);
         pdf.setLineWidth(0.3);
-        const titleWidth = pdf.getTextWidth("สรุปผลการทำงาน");
+        const titleWidth = pdf.getTextWidth("Conclusion");
         pdf.line(MARGIN, currentY + 1.5, MARGIN + titleWidth, currentY + 1.5);
         
         currentY += 10;
@@ -331,7 +360,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
         pdf.setTextColor(40, 40, 40);
         const conclusionLines = pdf.splitTextToSize(content.data as string, CONTENT_WIDTH);
         for (const line of conclusionLines) {
-          drawThaiText(pdf, line, MARGIN, currentY);
+          pdf.text(line, MARGIN, currentY);
           currentY += 5;
         }
       }
@@ -343,20 +372,25 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
 };
 
 export const downloadPDF = async (data: ReportData): Promise<void> => {
-  const blob = await generatePDF(data);
-  
-  // Create download link
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  
-  const fileName = data.jobInfo.clientName
-    ? `รายงาน_${data.jobInfo.clientName}_${new Date().toISOString().split("T")[0]}.pdf`
-    : `รายงาน_${new Date().toISOString().split("T")[0]}.pdf`;
-  
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  try {
+    const blob = await generatePDF(data);
+    
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    
+    const fileName = data.jobInfo.clientName
+      ? `Report_${data.jobInfo.clientName}_${new Date().toISOString().split("T")[0]}.pdf`
+      : `Report_${new Date().toISOString().split("T")[0]}.pdf`;
+    
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("PDF generation error:", error);
+    throw error;
+  }
 };
