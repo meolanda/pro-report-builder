@@ -21,6 +21,47 @@ const MAX_CAPTION_LINES = 2;
 // Navy color
 const NAVY = { r: 30, g: 58, b: 95 };
 
+// Dynamic Thai font loading (Sarabun) to avoid broken hardcoded Base64 strings.
+// We fetch a TTF at runtime, convert to Base64, then register it in jsPDF's VFS.
+const SARABUN_TTF_URL =
+  "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Regular.ttf";
+
+let sarabunTtfBase64Cache: string | null = null;
+
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+
+  return btoa(binary);
+};
+
+const loadSarabunBase64 = async (): Promise<string> => {
+  if (sarabunTtfBase64Cache) return sarabunTtfBase64Cache;
+
+  const res = await fetch(SARABUN_TTF_URL);
+  if (!res.ok) {
+    throw new Error(
+      `Failed to fetch Sarabun font: ${res.status} ${res.statusText}`
+    );
+  }
+
+  const buffer = await res.arrayBuffer();
+  sarabunTtfBase64Cache = arrayBufferToBase64(buffer);
+  return sarabunTtfBase64Cache;
+};
+
+const ensureThaiFont = async (pdf: jsPDF) => {
+  const base64 = await loadSarabunBase64();
+  pdf.addFileToVFS("Sarabun-Regular.ttf", base64);
+  pdf.addFont("Sarabun-Regular.ttf", "Sarabun", "normal");
+  pdf.setFont("Sarabun", "normal");
+};
+
 const formatDate = (dateString: string): string => {
   if (!dateString) return "-";
   const date = new Date(dateString);
@@ -108,15 +149,21 @@ const drawHeader = (
   let infoY = 8;
 
   if (data.jobInfo.clientName) {
-    pdf.text(`Client: ${data.jobInfo.clientName}`, rightX, infoY, { align: "right" });
+    pdf.text(`ลูกค้า: ${data.jobInfo.clientName}`, rightX, infoY, {
+      align: "right",
+    });
     infoY += 5;
   }
   if (data.jobInfo.location) {
-    pdf.text(`Location: ${data.jobInfo.location}`, rightX, infoY, { align: "right" });
+    pdf.text(`สถานที่: ${data.jobInfo.location}`, rightX, infoY, {
+      align: "right",
+    });
     infoY += 5;
   }
   if (data.jobInfo.dateTime) {
-    pdf.text(`Date: ${formatDate(data.jobInfo.dateTime)}`, rightX, infoY, { align: "right" });
+    pdf.text(`วันที่: ${formatDate(data.jobInfo.dateTime)}`, rightX, infoY, {
+      align: "right",
+    });
   }
 
   // Reset text color
@@ -141,11 +188,13 @@ const drawFooter = (
 
   // Reporter name (left)
   if (reporterName) {
-    pdf.text(`Reporter: ${reporterName}`, MARGIN, y);
+    pdf.text(`ผู้รายงาน: ${reporterName}`, MARGIN, y);
   }
 
   // Page number (right)
-  pdf.text(`Page ${pageNumber} / ${totalPages}`, A4_WIDTH - MARGIN, y, { align: "right" });
+  pdf.text(`หน้า ${pageNumber} / ${totalPages}`, A4_WIDTH - MARGIN, y, {
+    align: "right",
+  });
 
   // Reset text color
   pdf.setTextColor(0, 0, 0);
@@ -153,18 +202,19 @@ const drawFooter = (
 
 const wrapText = (pdf: jsPDF, text: string, maxWidth: number): string[] => {
   if (!text) return [];
-  
-  const words = text.split(/\s+/);
+
+  // Thai-friendly wrapping: wrap by characters (Thai often has no spaces)
+  const chars = text.split("");
   const lines: string[] = [];
   let currentLine = "";
 
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
+  for (const char of chars) {
+    const testLine = currentLine + char;
     const testWidth = pdf.getTextWidth(testLine);
 
     if (testWidth > maxWidth && currentLine) {
       lines.push(currentLine);
-      currentLine = word;
+      currentLine = char;
     } else {
       currentLine = testLine;
     }
@@ -189,8 +239,13 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
     format: "a4",
   });
 
-  // Use Helvetica (built-in font that works reliably)
-  pdf.setFont("Helvetica");
+  // Load Sarabun dynamically for Thai text support
+  try {
+    await ensureThaiFont(pdf);
+  } catch (error) {
+    console.error("Failed to load Sarabun font, using fallback:", error);
+    pdf.setFont("Helvetica");
+  }
 
   let currentY = HEADER_HEIGHT + MARGIN + 5;
   const contentEndY = A4_HEIGHT - FOOTER_HEIGHT - MARGIN;
@@ -269,6 +324,13 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
     const currentPage = pageIndex + 1;
     currentY = HEADER_HEIGHT + MARGIN + 5;
 
+    // Ensure Thai font is active on each page (jsPDF state may reset after addPage)
+    try {
+      pdf.setFont("Sarabun", "normal");
+    } catch {
+      pdf.setFont("Helvetica");
+    }
+
     // Draw header and footer
     drawHeader(pdf, convertedData, currentPage, totalPages);
     drawFooter(pdf, convertedData.jobInfo.reporterName, currentPage, totalPages);
@@ -343,16 +405,18 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
         currentY += IMAGE_HEIGHT + maxCaptionHeight + 8;
       } else if (content.type === "conclusion") {
         // Conclusion section
+        const conclusionTitle = "สรุปผลการทำงาน";
+
         pdf.setFontSize(12);
         pdf.setTextColor(NAVY.r, NAVY.g, NAVY.b);
-        pdf.text("Conclusion", MARGIN, currentY);
-        
+        pdf.text(conclusionTitle, MARGIN, currentY);
+
         // Underline
         pdf.setDrawColor(NAVY.r, NAVY.g, NAVY.b);
         pdf.setLineWidth(0.3);
-        const titleWidth = pdf.getTextWidth("Conclusion");
+        const titleWidth = pdf.getTextWidth(conclusionTitle);
         pdf.line(MARGIN, currentY + 1.5, MARGIN + titleWidth, currentY + 1.5);
-        
+
         currentY += 10;
 
         // Conclusion text
@@ -381,8 +445,8 @@ export const downloadPDF = async (data: ReportData): Promise<void> => {
     link.href = url;
     
     const fileName = data.jobInfo.clientName
-      ? `Report_${data.jobInfo.clientName}_${new Date().toISOString().split("T")[0]}.pdf`
-      : `Report_${new Date().toISOString().split("T")[0]}.pdf`;
+      ? `รายงาน_${data.jobInfo.clientName}_${new Date().toISOString().split("T")[0]}.pdf`
+      : `รายงาน_${new Date().toISOString().split("T")[0]}.pdf`;
     
     link.download = fileName;
     document.body.appendChild(link);
