@@ -11,7 +11,7 @@ interface PhotoCardProps {
 const PhotoCard = ({ photo, onCaptionChange, onDelete, dragHandleProps }: PhotoCardProps) => {
   return (
     <div className="photo-card animate-slide-up group">
-      <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+      <div className="relative aspect-[4/3] bg-muted overflow-hidden rounded-lg shadow-sm">
         <img
           src={photo.preview}
           alt={photo.caption || "รูปภาพ"}
@@ -19,7 +19,7 @@ const PhotoCard = ({ photo, onCaptionChange, onDelete, dragHandleProps }: PhotoC
         />
         
         {/* Overlay Actions */}
-        <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/20 transition-all duration-200">
+        <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/20 transition-all duration-200 rounded-lg">
           <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={onDelete}
