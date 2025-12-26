@@ -134,9 +134,9 @@ const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
         className="mb-4"
       />
 
-      {/* Photos Grid */}
+      {/* Photos Grid - Full width 2 columns with comfortable spacing */}
       {section.photos.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4 w-full">
           {section.photos.map((photo, index) => (
             <div key={photo.id} className="relative break-inside-avoid print:break-inside-avoid">
               <PhotoCard
