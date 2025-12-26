@@ -80,7 +80,7 @@ const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
   };
 
   return (
-    <div className="section-card animate-slide-up">
+    <div className="section-card animate-slide-up break-before-page print:break-before-page">
       {/* Section Header */}
       <div className="flex items-center justify-between gap-4 border-b border-border pb-4 mb-5">
         {isEditingTitle ? (
@@ -138,7 +138,7 @@ const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
       {section.photos.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           {section.photos.map((photo, index) => (
-            <div key={photo.id} className="relative">
+            <div key={photo.id} className="relative break-inside-avoid print:break-inside-avoid">
               <PhotoCard
                 photo={photo}
                 onCaptionChange={(caption) => handleCaptionChange(photo.id, caption)}
