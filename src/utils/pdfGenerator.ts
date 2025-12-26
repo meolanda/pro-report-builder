@@ -295,11 +295,17 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
     }
   };
 
-  // Process sections
-  for (const section of convertedData.sections) {
+  // Process sections - ONE SECTION PER PAGE rule
+  for (let sectionIndex = 0; sectionIndex < convertedData.sections.length; sectionIndex++) {
+    const section = convertedData.sections[sectionIndex];
+    
+    // Force new page for each section (except first section on first page)
+    if (sectionIndex > 0 || currentPageContent.length > 0) {
+      addNewPage();
+    }
+
     // Section title
     const titleHeight = 10;
-    checkAndAddNewPage(titleHeight);
     currentPageContent.push({ type: "section-title", data: section.title });
     currentY += titleHeight;
 
@@ -319,7 +325,14 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
       }
 
       const rowHeight = IMAGE_HEIGHT + maxCaptionHeight + ROW_GAP;
-      checkAndAddNewPage(rowHeight);
+      
+      // Check if row fits, if not add new page (continue same section)
+      if (currentY + rowHeight > contentEndY) {
+        addNewPage();
+        // Re-add section title on continued page
+        currentPageContent.push({ type: "section-title", data: `${section.title} (ต่อ)` });
+        currentY += titleHeight;
+      }
 
       currentPageContent.push({
         type: "image-row",
@@ -327,8 +340,6 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
       });
       currentY += rowHeight;
     }
-
-    currentY += 3; // Reduced space between sections
   }
 
   // Conclusion
