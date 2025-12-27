@@ -226,6 +226,22 @@ const Index = () => {
                   onDelete={() => deleteSection(section.id)}
                 />
               ))}
+
+              {/* --- แทรกกล่องหลอกระบบ (White Text Spacer) --- */}
+              <div
+                aria-hidden="true"
+                style={{
+                  height: "120px",
+                  width: "100%",
+                  // “White Text Spacer”: มีตัวอักษรจองที่ แต่เป็นสีขาว (มักไม่ถูก PDF ตัดทิ้ง)
+                  color: "hsl(0 0% 100%)",
+                  fontSize: "1px",
+                  lineHeight: "1px",
+                  userSelect: "none",
+                }}
+              >
+                .
+              </div>
             </div>
 
             {/* Conclusion */}
