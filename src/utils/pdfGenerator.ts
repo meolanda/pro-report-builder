@@ -1,12 +1,14 @@
 import jsPDF from "jspdf";
 import { ReportData } from "@/types/report";
+import pdfHeaderImage from "@/assets/pdf-header.jpg";
 
 // A4 dimensions in mm
 const A4_WIDTH = 210;
 const A4_HEIGHT = 297;
 const MARGIN = 15;
 const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
-const HEADER_HEIGHT = 20;
+const FIXED_HEADER_HEIGHT = 25; // Height for fixed header image
+const HEADER_HEIGHT = FIXED_HEADER_HEIGHT + 18; // Total header area including job info
 const FOOTER_HEIGHT = 12;
 
 // Image settings - optimized for 6 images per page (2 cols x 3 rows)
@@ -99,11 +101,6 @@ const imageToBase64 = async (imageUrl: string): Promise<string> => {
 // Preload all images and convert to Base64
 const preloadImages = async (data: ReportData): Promise<ReportData> => {
   const convertedData = { ...data };
-  
-  // Convert logo
-  if (convertedData.jobInfo.logo) {
-    convertedData.jobInfo.logo = await imageToBase64(convertedData.jobInfo.logo);
-  }
 
   // Convert all section photos
   convertedData.sections = await Promise.all(
@@ -121,73 +118,64 @@ const preloadImages = async (data: ReportData): Promise<ReportData> => {
   return convertedData;
 };
 
-const drawHeader = (
+// Cache for fixed header image Base64
+let fixedHeaderBase64Cache: string | null = null;
+
+const loadFixedHeaderImage = async (): Promise<string> => {
+  if (fixedHeaderBase64Cache) return fixedHeaderBase64Cache;
+  fixedHeaderBase64Cache = await imageToBase64(pdfHeaderImage);
+  return fixedHeaderBase64Cache;
+};
+
+const drawHeader = async (
   pdf: jsPDF,
   data: ReportData,
   pageNumber: number,
   totalPages: number
 ) => {
-  // Draw header background
-  pdf.setFillColor(NAVY.r, NAVY.g, NAVY.b);
-  pdf.rect(0, 0, A4_WIDTH, HEADER_HEIGHT + 3, "F");
-
-  // Logo (left side) - supports wide/landscape logos
-  if (data.jobInfo.logo) {
-    try {
-      // Max logo dimensions: height 16mm, width up to 70% of content width
-      const maxLogoHeight = 16;
-      const maxLogoWidth = CONTENT_WIDTH * 0.6;
-      
-      // Create temp image to get dimensions
-      const img = new Image();
-      img.src = data.jobInfo.logo;
-      
-      let logoWidth = maxLogoWidth;
-      let logoHeight = maxLogoHeight;
-      
-      // If image loaded, calculate proper aspect ratio
-      if (img.naturalWidth && img.naturalHeight) {
-        const aspectRatio = img.naturalWidth / img.naturalHeight;
-        if (aspectRatio > 1) {
-          // Wide logo
-          logoWidth = Math.min(maxLogoWidth, maxLogoHeight * aspectRatio);
-          logoHeight = logoWidth / aspectRatio;
-        } else {
-          // Tall or square logo
-          logoHeight = maxLogoHeight;
-          logoWidth = logoHeight * aspectRatio;
-        }
-      }
-      
-      pdf.addImage(data.jobInfo.logo, "PNG", MARGIN, 3, logoWidth, logoHeight);
-    } catch (e) {
-      console.error("Failed to add logo:", e);
-    }
+  // Draw fixed header image (full width)
+  try {
+    const headerBase64 = await loadFixedHeaderImage();
+    // Full width header image at top of page
+    pdf.addImage(headerBase64, "JPEG", 0, 0, A4_WIDTH, FIXED_HEADER_HEIGHT);
+  } catch (e) {
+    console.error("Failed to add header image:", e);
+    // Fallback: draw navy background
+    pdf.setFillColor(NAVY.r, NAVY.g, NAVY.b);
+    pdf.rect(0, 0, A4_WIDTH, FIXED_HEADER_HEIGHT, "F");
   }
 
-  // Job info (right side)
+  // Draw job info bar below header image
+  const infoBarY = FIXED_HEADER_HEIGHT;
+  const infoBarHeight = 18;
+  pdf.setFillColor(NAVY.r, NAVY.g, NAVY.b);
+  pdf.rect(0, infoBarY, A4_WIDTH, infoBarHeight, "F");
+
+  // Job info text
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(9);
 
+  const leftX = MARGIN;
   const rightX = A4_WIDTH - MARGIN;
-  let infoY = 8;
+  let infoY = infoBarY + 6;
 
+  // Left side - client name
   if (data.jobInfo.clientName) {
-    pdf.text(`ลูกค้า: ${data.jobInfo.clientName}`, rightX, infoY, {
-      align: "right",
-    });
-    infoY += 5;
+    pdf.text(`ลูกค้า: ${data.jobInfo.clientName}`, leftX, infoY);
   }
-  if (data.jobInfo.location) {
-    pdf.text(`สถานที่: ${data.jobInfo.location}`, rightX, infoY, {
-      align: "right",
-    });
-    infoY += 5;
-  }
+  
+  // Right side - date
   if (data.jobInfo.dateTime) {
     pdf.text(`วันที่: ${formatDate(data.jobInfo.dateTime)}`, rightX, infoY, {
       align: "right",
     });
+  }
+
+  infoY += 6;
+
+  // Left side - location
+  if (data.jobInfo.location) {
+    pdf.text(`สถานที่: ${data.jobInfo.location}`, leftX, infoY);
   }
 
   // Reset text color
@@ -367,7 +355,7 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
     }
 
     // Draw header and footer
-    drawHeader(pdf, convertedData, currentPage, totalPages);
+    await drawHeader(pdf, convertedData, currentPage, totalPages);
     drawFooter(pdf, convertedData.jobInfo.reporterName, currentPage, totalPages);
 
     // Render page content
