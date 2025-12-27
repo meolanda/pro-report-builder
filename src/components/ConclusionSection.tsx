@@ -7,9 +7,9 @@ interface ConclusionSectionProps {
 
 const ConclusionSection = ({ conclusion, onChange }: ConclusionSectionProps) => {
   return (
-    <div className="mt-12 pt-8 break-inside-avoid print:break-inside-avoid">
-      {/* Divider Line */}
-      <div className="border-t border-border mb-8" />
+    <div className="mt-16 pt-8 break-inside-avoid print:break-inside-avoid">
+      {/* Divider Line - Gray thin border to separate from photos */}
+      <div className="border-t border-muted-foreground/30 mb-10" />
       
       <div className="section-card animate-fade-in">
         <h2 className="section-header flex items-center gap-2">
