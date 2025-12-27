@@ -474,15 +474,18 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
         pdf.setLineWidth(0.3);
         pdf.roundedRect(MARGIN, boxY, CONTENT_WIDTH, boxHeight, 3, 3, "FD");
 
-        // Contact text
+        // Contact text from footerNote
         pdf.setFontSize(9);
         pdf.setTextColor(120, 120, 120);
-        const contactLine1 = "ขอบคุณที่ไว้วางใจใช้บริการ";
-        const contactLine2 = "หากพบปัญหาการใช้งาน กรุณาติดต่อ: โทร. 02-XXX-XXXX / Line: @yourcompany";
+        const footerText = data.jobInfo.footerNote || "ขอบคุณที่ไว้วางใจใช้บริการ";
+        const footerLines = footerText.split("\n");
         
         const textCenterX = A4_WIDTH / 2;
-        pdf.text(contactLine1, textCenterX, boxY + 9, { align: "center" });
-        pdf.text(contactLine2, textCenterX, boxY + 17, { align: "center" });
+        let footerY = boxY + 9;
+        for (const line of footerLines) {
+          pdf.text(line.trim(), textCenterX, footerY, { align: "center" });
+          footerY += 8;
+        }
         
         currentY += boxHeight + 5;
       }

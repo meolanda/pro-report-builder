@@ -25,6 +25,7 @@ const Index = () => {
     location: "",
     reporterName: "",
     logo: null,
+    footerNote: "ขอบคุณที่ไว้วางใจใช้บริการ\nหากพบปัญหาการใช้งาน กรุณาติดต่อ...",
   });
 
   const [sections, setSections] = useState<PhotoSectionType[]>([
@@ -259,7 +260,12 @@ const Index = () => {
             </div>
 
             {/* Conclusion */}
-            <ConclusionSection conclusion={conclusion} onChange={setConclusion} />
+            <ConclusionSection 
+              conclusion={conclusion} 
+              onChange={setConclusion}
+              footerNote={jobInfo.footerNote}
+              onFooterNoteChange={(note) => setJobInfo({ ...jobInfo, footerNote: note })}
+            />
 
             {/* Action Buttons */}
             <div className="flex flex-wrap justify-center gap-4 pt-4">
