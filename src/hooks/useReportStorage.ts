@@ -224,6 +224,7 @@ export const useReportStorage = () => {
           location: report.location || "",
           reporterName: report.reporter_name || "",
           logo: report.logo_url,
+          footerNote: "ขอบคุณที่ไว้วางใจใช้บริการ\nหากพบปัญหาการใช้งาน กรุณาติดต่อ...",
         },
         sections: loadedSections,
         conclusion: report.conclusion || "",

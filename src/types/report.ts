@@ -17,6 +17,7 @@ export interface JobInfo {
   location: string;
   reporterName: string;
   logo: string | null;
+  footerNote: string;
 }
 
 export interface ReportData {
