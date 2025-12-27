@@ -1,4 +1,4 @@
-import { Upload, Building2, Calendar, MapPin, User } from "lucide-react";
+import { Building2, Calendar, MapPin, User } from "lucide-react";
 import { JobInfo } from "@/types/report";
 
 interface JobInfoFormProps {
@@ -7,17 +7,6 @@ interface JobInfoFormProps {
 }
 
 const JobInfoForm = ({ jobInfo, onChange }: JobInfoFormProps) => {
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        onChange({ ...jobInfo, logo: event.target?.result as string });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   return (
     <div className="section-card animate-fade-in">
       <h2 className="section-header flex items-center gap-2">
@@ -26,41 +15,6 @@ const JobInfoForm = ({ jobInfo, onChange }: JobInfoFormProps) => {
       </h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Logo Upload */}
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-foreground mb-2">
-            โลโก้บริษัท
-          </label>
-          <div className="flex items-center gap-4">
-            {jobInfo.logo ? (
-              <div className="relative">
-                <img 
-                  src={jobInfo.logo} 
-                  alt="Company Logo" 
-                  className="h-16 w-auto object-contain border border-border rounded-md p-2 bg-card"
-                />
-                <button
-                  onClick={() => onChange({ ...jobInfo, logo: null })}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs hover:opacity-90 transition-opacity"
-                >
-                  ×
-                </button>
-              </div>
-            ) : (
-              <label className="btn-secondary cursor-pointer">
-                <Upload className="w-4 h-4" />
-                <span>อัปโหลดโลโก้</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
-        </div>
-
         {/* Client Name */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
