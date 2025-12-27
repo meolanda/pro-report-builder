@@ -342,9 +342,9 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
     }
   }
 
-  // Conclusion
+  // Conclusion - บังคับขึ้นหน้าใหม่เสมอ
   if (convertedData.conclusion && convertedData.conclusion.trim()) {
-    checkAndAddNewPage(40);
+    addNewPage(); // Force new page for conclusion
     currentPageContent.push({ type: "conclusion", data: convertedData.conclusion });
   }
 
