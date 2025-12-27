@@ -228,8 +228,8 @@ const Index = () => {
               ))}
             </div>
 
-            {/* Spacer before Conclusion - Fixed height to ensure PDF respects spacing */}
-            <div className="w-full h-16 min-h-[64px] print:block" aria-hidden="true"></div>
+            {/* Spacer before Conclusion - Fixed height with invisible content to prevent removal */}
+            <div className="w-full h-16 min-h-[64px] print:block text-transparent select-none" aria-hidden="true">.</div>
 
             {/* Conclusion */}
             <ConclusionSection conclusion={conclusion} onChange={setConclusion} />
