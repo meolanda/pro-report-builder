@@ -30,7 +30,17 @@ const Index = () => {
   const [sections, setSections] = useState<PhotoSectionType[]>([
     {
       id: "section-1",
-      title: "ก่อนเริ่มงาน",
+      title: "1. สภาพหน้างานก่อนเริ่มงาน",
+      photos: [],
+    },
+    {
+      id: "section-2",
+      title: "2. ภาพขณะปฏิบัติงาน",
+      photos: [],
+    },
+    {
+      id: "section-3",
+      title: "3. ผลงานหลังทำเสร็จ / ส่งมอบงาน",
       photos: [],
     },
   ]);
@@ -45,7 +55,11 @@ const Index = () => {
         const data = await loadReport(reportId);
         if (data) {
           setJobInfo(data.jobInfo);
-          setSections(data.sections.length > 0 ? data.sections : [{ id: "section-1", title: "ก่อนเริ่มงาน", photos: [] }]);
+          setSections(data.sections.length > 0 ? data.sections : [
+            { id: "section-1", title: "1. สภาพหน้างานก่อนเริ่มงาน", photos: [] },
+            { id: "section-2", title: "2. ภาพขณะปฏิบัติงาน", photos: [] },
+            { id: "section-3", title: "3. ผลงานหลังทำเสร็จ / ส่งมอบงาน", photos: [] },
+          ]);
           setConclusion(data.conclusion);
           toast({
             title: "โหลดรายงานสำเร็จ",
