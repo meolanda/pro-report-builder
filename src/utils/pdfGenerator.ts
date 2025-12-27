@@ -8,7 +8,7 @@ const A4_HEIGHT = 297;
 const MARGIN = 15;
 const CONTENT_WIDTH = A4_WIDTH - MARGIN * 2;
 const FIXED_HEADER_HEIGHT = 25; // Height for fixed header image
-const HEADER_HEIGHT = FIXED_HEADER_HEIGHT + 18; // Total header area including job info
+const HEADER_HEIGHT = FIXED_HEADER_HEIGHT + 24; // Total header area including job info (3 lines)
 const FOOTER_HEIGHT = 12;
 
 // Image settings - optimized for 6 images per page (2 cols x 3 rows)
@@ -147,7 +147,7 @@ const drawHeader = async (
 
   // Draw job info bar below header image
   const infoBarY = FIXED_HEADER_HEIGHT;
-  const infoBarHeight = 18;
+  const infoBarHeight = 24; // Increased to fit 3 lines
   pdf.setFillColor(NAVY.r, NAVY.g, NAVY.b);
   pdf.rect(0, infoBarY, A4_WIDTH, infoBarHeight, "F");
 
@@ -159,12 +159,20 @@ const drawHeader = async (
   const rightX = A4_WIDTH - MARGIN;
   let infoY = infoBarY + 6;
 
-  // Left side - client name
+  // Row 1: Subject (centered, full width)
+  if (data.jobInfo.subject) {
+    pdf.setFontSize(10);
+    pdf.text(`เรื่อง: ${data.jobInfo.subject}`, A4_WIDTH / 2, infoY, { align: "center" });
+    pdf.setFontSize(9);
+  }
+
+  infoY += 6;
+
+  // Row 2: Client name (left) and Date (right)
   if (data.jobInfo.clientName) {
     pdf.text(`ลูกค้า: ${data.jobInfo.clientName}`, leftX, infoY);
   }
   
-  // Right side - date
   if (data.jobInfo.dateTime) {
     pdf.text(`วันที่: ${formatDate(data.jobInfo.dateTime)}`, rightX, infoY, {
       align: "right",
@@ -173,7 +181,7 @@ const drawHeader = async (
 
   infoY += 6;
 
-  // Left side - location
+  // Row 3: Location
   if (data.jobInfo.location) {
     pdf.text(`สถานที่: ${data.jobInfo.location}`, leftX, infoY);
   }

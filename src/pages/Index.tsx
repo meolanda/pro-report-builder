@@ -26,6 +26,7 @@ const Index = () => {
     reporterName: "",
     logo: null,
     footerNote: "ขอบคุณที่ไว้วางใจใช้บริการ\nหากพบปัญหาการใช้งาน กรุณาติดต่อ...",
+    subject: "",
   });
 
   const [sections, setSections] = useState<PhotoSectionType[]>([
