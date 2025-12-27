@@ -11,7 +11,7 @@ interface PhotoCardProps {
 const PhotoCard = ({ photo, onCaptionChange, onDelete, dragHandleProps }: PhotoCardProps) => {
   return (
     <div className="photo-card animate-slide-up group">
-      <div className="relative aspect-[4/3] bg-muted overflow-hidden rounded-lg shadow-sm">
+      <div className="relative h-64 bg-muted overflow-hidden rounded-lg shadow-sm">
         <img
           src={photo.preview}
           alt={photo.caption || "รูปภาพ"}

@@ -78,16 +78,16 @@ const JobInfoForm = ({ jobInfo, onChange }: JobInfoFormProps) => {
           />
         </div>
 
-        {/* Date/Time */}
+        {/* Date */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
             <span className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-muted-foreground" />
-              วันที่/เวลา
+              วันที่
             </span>
           </label>
           <input
-            type="datetime-local"
+            type="date"
             value={jobInfo.dateTime}
             onChange={(e) => onChange({ ...jobInfo, dateTime: e.target.value })}
             className="input-field"
