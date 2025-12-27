@@ -7,23 +7,38 @@ interface ConclusionSectionProps {
 
 const ConclusionSection = ({ conclusion, onChange }: ConclusionSectionProps) => {
   return (
-    <div className="w-full clear-both mt-16 border-t border-muted-foreground/30 pt-8 break-inside-avoid print:break-inside-avoid">
-      
-      <div className="section-card animate-fade-in">
-        <h2 className="section-header flex items-center gap-2">
-          <FileText className="w-5 h-5" />
-          สรุปผลการทำงาน (Conclusion)
-        </h2>
-        
-        <textarea
-          value={conclusion}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="พิมพ์สรุปผลการทำงานที่นี่..."
-          rows={6}
-          className="input-field resize-y min-h-[150px]"
-        />
+    <>
+      {/* ดันด้วย br แบบบ้านๆ แต่ได้ผลชัวร์ */}
+      <br />
+      <br />
+      <br />
+
+      <div
+        className="w-full clear-both break-inside-avoid print:break-inside-avoid"
+        style={{
+          marginTop: "50px",
+          borderTop: "1px solid #e5e7eb",
+          paddingTop: "30px",
+          width: "100%",
+          pageBreakInside: "avoid",
+        }}
+      >
+        <div className="section-card animate-fade-in">
+          <h2 className="section-header flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            สรุปผลการทำงาน (Conclusion)
+          </h2>
+
+          <textarea
+            value={conclusion}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="พิมพ์สรุปผลการทำงานที่นี่..."
+            rows={6}
+            className="input-field resize-y min-h-[150px]"
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
