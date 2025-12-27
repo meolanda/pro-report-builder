@@ -462,6 +462,29 @@ export const generatePDF = async (data: ReportData): Promise<Blob> => {
           pdf.text(line, MARGIN, currentY);
           currentY += 5;
         }
+
+        // Contact footer box
+        currentY += 15;
+        
+        // Draw contact box
+        const boxY = currentY;
+        const boxHeight = 25;
+        pdf.setFillColor(248, 248, 248);
+        pdf.setDrawColor(220, 220, 220);
+        pdf.setLineWidth(0.3);
+        pdf.roundedRect(MARGIN, boxY, CONTENT_WIDTH, boxHeight, 3, 3, "FD");
+
+        // Contact text
+        pdf.setFontSize(9);
+        pdf.setTextColor(120, 120, 120);
+        const contactLine1 = "ขอบคุณที่ไว้วางใจใช้บริการ";
+        const contactLine2 = "หากพบปัญหาการใช้งาน กรุณาติดต่อ: โทร. 02-XXX-XXXX / Line: @yourcompany";
+        
+        const textCenterX = A4_WIDTH / 2;
+        pdf.text(contactLine1, textCenterX, boxY + 9, { align: "center" });
+        pdf.text(contactLine2, textCenterX, boxY + 17, { align: "center" });
+        
+        currentY += boxHeight + 5;
       }
     }
   }
