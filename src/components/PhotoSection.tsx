@@ -80,7 +80,7 @@ const PhotoSection = ({ section, onUpdate, onDelete }: PhotoSectionProps) => {
   };
 
   return (
-    <div className="section-card animate-slide-up break-before-page print:break-before-page">
+    <div className="section-card animate-slide-up break-before-page print:break-before-page pb-24">
       {/* Section Header */}
       <div className="flex items-center justify-between gap-4 border-b border-border pb-4 mb-5">
         {isEditingTitle ? (
