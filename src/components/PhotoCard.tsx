@@ -111,7 +111,7 @@ const PhotoCard = ({ photo, onCaptionChange, onDelete, dragHandleProps }: PhotoC
 
           {/* Overlay */}
           <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/20 transition-all duration-200 rounded-lg">
-            <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
               <button
                 onClick={openLightbox}
                 className="p-2 bg-card/95 text-foreground rounded-md hover:bg-muted shadow-md"
@@ -137,10 +137,10 @@ const PhotoCard = ({ photo, onCaptionChange, onDelete, dragHandleProps }: PhotoC
             )}
           </div>
 
-          {/* Invisible click area */}
+          {/* Invisible click area — stays below z-10 buttons */}
           <button
             onClick={openLightbox}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-zoom-in"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-zoom-in z-0"
             aria-label="ดูรูปขนาดใหญ่"
           />
         </div>
